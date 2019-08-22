@@ -119,7 +119,7 @@
 ;;;; Variables
 
 (defconst org-super-agenda-special-selectors
-  '(:name :order :face :transformer)
+  '(:name :order :face :transformer :header-face)
   ;; This needs to be manually updated if any are added.
   "Special, non-grouping selectors.")
 
@@ -255,13 +255,13 @@ A and B are Org timestamp elements."
   "Return list of tags in agenda item string S."
   (org-find-text-property-in-string 'tags s))
 
-(defun org-super-agenda--make-agenda-header (s)
+(defun org-super-agenda--make-agenda-header (s face)
   "Return agenda header containing string S.
 Prepended with `org-super-agenda-header-separator'."
   (pcase s
     ('none "")
     (_ (setq s (concat " " s))
-       (add-face-text-property 0 (length s) 'org-super-agenda-header t s)
+       (add-face-text-property 0 (length s) face t s)
        (org-add-props s nil
          'keymap org-super-agenda-header-map
          ;; NOTE: According to the manual, only `keymap' should be necessary, but in my
@@ -735,6 +735,7 @@ The string should be the priority cookie letter, e.g. \"A\".")
                  for filter in org-super-agenda-groups
                  for custom-section-name = (plist-get filter :name)
                  for order = (or (plist-get filter :order) 0)  ; Lowest number first, 0 by default
+                 for header-face = (or (plist-get filter :header-face) 'org-super-agenda-header)
                  for (auto-section-name non-matching matching) = (org-super-agenda--group-dispatch all-items filter)
 
                  ;; Transformer
@@ -759,6 +760,7 @@ The string should be the priority cookie letter, e.g. \"A\".")
                  and append (cl-loop for group in matching
                                      collect (list :name (plist-get group :name)
                                                    :items (plist-get group :items)
+                                                   :header-face header-face
                                                    :order order))
                  into sections
                  and do (setq all-items non-matching)
@@ -766,7 +768,11 @@ The string should be the priority cookie letter, e.g. \"A\".")
                  ;; Manual groups
                  else
                  do (setq section-name (or custom-section-name auto-section-name))
-                 and collect (list :name section-name :items matching :order order) into sections
+                 and collect (list :name section-name
+                                   :items matching
+                                   :header-face header-face
+                                   :order order)
+                 into sections
                  and do (setq all-items non-matching)
 
                  ;; Sort sections by :order then :name
@@ -791,9 +797,9 @@ The string should be the priority cookie letter, e.g. \"A\".")
                                                            (t nil)))
                                                    (push non-matching sections)))
                  ;; Insert sections
-                 finally return (cl-loop for (_ name _ items) in sections
+                 finally return (cl-loop for (_ name _ items _ hf) in sections
                                          when items
-                                         collect (org-super-agenda--make-agenda-header name)
+                                         collect (org-super-agenda--make-agenda-header name hf)
                                          and append items)))
     ;; No super-filters; return list unmodified
     all-items))
